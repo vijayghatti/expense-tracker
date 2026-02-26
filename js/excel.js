@@ -178,6 +178,88 @@ const Excel = (() => {
     App.openModal(html);
   }
 
+  const VALID_PAYMENT_METHODS = ['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Other'];
+
+  /**
+   * Validates all rows against required field rules.
+   * Returns an array of error strings; empty array means all rows are valid.
+   */
+  function validateImportRows(rows, dateCol, amountCol, categoryCol, paymentCol) {
+    const validCategories = Store.getCategories().map(c => c.name);
+    const errors = [];
+    const MAX_ERRORS = 25; // cap to keep the modal readable
+
+    rows.forEach((row, idx) => {
+      if (errors.length >= MAX_ERRORS) return;
+      const rowNum = idx + 2; // row 1 = header
+
+      // --- Date (required) ---
+      const dateVal = String(row[dateCol] || '').trim();
+      if (!dateVal) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else if (!parseDate(dateVal)) {
+        errors.push(`Row ${rowNum}: Date "${dateVal}" is not a recognised date — use YYYY-MM-DD or DD/MM/YYYY`);
+      }
+
+      // --- Amount (required, must be a positive number) ---
+      const rawAmt = String(row[amountCol] || '').trim();
+      if (!rawAmt) {
+        errors.push(`Row ${rowNum}: Amount is required`);
+      } else {
+        const num = parseFloat(rawAmt.replace(/[^0-9.\-]/g, ''));
+        if (isNaN(num)) {
+          errors.push(`Row ${rowNum}: Amount "${rawAmt}" is not a valid number`);
+        } else if (num <= 0) {
+          errors.push(`Row ${rowNum}: Amount must be greater than 0 (got ${num})`);
+        }
+      }
+
+      // --- Category (optional, but must match a known category if provided) ---
+      if (categoryCol) {
+        const catVal = String(row[categoryCol] || '').trim();
+        if (catVal && !validCategories.includes(catVal)) {
+          errors.push(`Row ${rowNum}: Category "${catVal}" is not recognised — valid values: ${validCategories.join(', ')}`);
+        }
+      }
+
+      // --- Payment Method (optional, but must match a known method if provided) ---
+      if (paymentCol) {
+        const payVal = String(row[paymentCol] || '').trim();
+        if (payVal && !VALID_PAYMENT_METHODS.includes(payVal)) {
+          errors.push(`Row ${rowNum}: Payment method "${payVal}" is not recognised — valid values: ${VALID_PAYMENT_METHODS.join(', ')}`);
+        }
+      }
+    });
+
+    return errors;
+  }
+
+  /** Renders a validation-error modal and aborts the import. */
+  function showValidationErrors(errors, totalRows) {
+    const hasMore = errors.length >= 25;
+    const html = `
+      <div class="modal-header">
+        <h3 class="modal-title">⚠️ Import Validation Failed</h3>
+        <button class="modal-close" onclick="App.closeModal()">&times;</button>
+      </div>
+      <p style="color:var(--danger);margin-bottom:12px;font-size:0.9rem">
+        Import was cancelled — found <strong>${errors.length}${hasMore ? '+' : ''} error(s)</strong> across ${totalRows} rows.
+        Please fix your file and try again.
+      </p>
+      <div style="max-height:280px;overflow-y:auto;background:var(--bg-secondary);border-radius:8px;padding:10px 12px;">
+        ${errors.map(e => `
+          <div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:0.82rem;color:var(--danger);display:flex;gap:6px;align-items:flex-start">
+            <span style="flex-shrink:0">⛔</span><span>${Utils.escapeHtml(e)}</span>
+          </div>`).join('')}
+        ${hasMore ? `<div style="padding:6px 0;color:var(--text-muted);font-size:0.8rem;font-style:italic">… and more errors not shown. Fix the above and re-import.</div>` : ''}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="App.closeModal()">Close</button>
+      </div>
+    `;
+    App.openModal(html);
+  }
+
   function doImport() {
     const rows = window._importData;
     if (!rows) return;
@@ -193,44 +275,47 @@ const Excel = (() => {
       return;
     }
 
+    // --- Validate all rows before touching any data ---
+    const validationErrors = validateImportRows(rows, dateCol, amountCol, categoryCol, paymentCol);
+    if (validationErrors.length > 0) {
+      showValidationErrors(validationErrors, rows.length);
+      return; // abort — do NOT import
+    }
+
     const categories = Store.getCategories().map(c => c.name);
     let imported = 0;
-    let skipped = 0;
     const newExpenses = [];
 
     rows.forEach(row => {
       const dateVal = String(row[dateCol] || '').trim();
       const amountVal = parseFloat(String(row[amountCol] || '').replace(/[^0-9.\-]/g, ''));
+      const date = parseDate(dateVal);
 
-      if (!dateVal || isNaN(amountVal)) { skipped++; return; }
+      // These checks are redundant after validation, but kept as a safety net
+      if (!date || isNaN(amountVal) || amountVal <= 0) return;
 
-      // Parse date - try multiple formats
-      let date = parseDate(dateVal);
-      if (!date) { skipped++; return; }
-
-      let category = categoryCol ? String(row[categoryCol] || '').trim() : 'Other';
-      if (!categories.includes(category)) category = 'Other';
+      const category = categoryCol ? (String(row[categoryCol] || '').trim() || 'Other') : 'Other';
+      const paymentMethod = paymentCol ? (String(row[paymentCol] || '').trim() || 'Other') : 'Other';
 
       newExpenses.push({
         id: Utils.generateId(),
         createdAt: new Date().toISOString(),
-        date: date,
+        date,
         amount: Math.abs(amountVal),
-        category: category,
+        category,
         description: descCol ? String(row[descCol] || '').trim() : '',
-        paymentMethod: paymentCol ? String(row[paymentCol] || '').trim() : 'Other',
+        paymentMethod,
         isRecurring: false
       });
       imported++;
     });
 
-    // Replace any existing expenses so only the latest imported file's
-    // data is kept in the app.
+    // Replace any existing expenses so only the latest imported file's data is kept.
     Store.setExpenses(newExpenses);
 
     delete window._importData;
     App.closeModal();
-    Utils.showToast(`Imported ${imported} expenses${skipped ? `, ${skipped} skipped` : ''}`);
+    Utils.showToast(`Imported ${imported} expense${imported !== 1 ? 's' : ''} successfully`);
     Expenses.render();
     Dashboard.render();
   }
