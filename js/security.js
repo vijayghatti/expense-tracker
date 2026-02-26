@@ -178,6 +178,14 @@ const Security = (() => {
     }
   }
 
-  return { init };
+  const api = { init };
+
+  // Expose on window so App boot logic can find it
+  if (typeof window !== 'undefined') {
+    window.Security = api;
+  }
+
+  return api;
 })();
+
 
