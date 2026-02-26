@@ -193,13 +193,10 @@ const Excel = (() => {
       return;
     }
 
-    // Replace any existing expenses so only the latest imported file's
-    // data is kept in the app.
-    Store.setExpenses([]);
-
     const categories = Store.getCategories().map(c => c.name);
     let imported = 0;
     let skipped = 0;
+    const newExpenses = [];
 
     rows.forEach(row => {
       const dateVal = String(row[dateCol] || '').trim();
@@ -214,7 +211,9 @@ const Excel = (() => {
       let category = categoryCol ? String(row[categoryCol] || '').trim() : 'Other';
       if (!categories.includes(category)) category = 'Other';
 
-      Store.addExpense({
+      newExpenses.push({
+        id: Utils.generateId(),
+        createdAt: new Date().toISOString(),
         date: date,
         amount: Math.abs(amountVal),
         category: category,
@@ -224,6 +223,10 @@ const Excel = (() => {
       });
       imported++;
     });
+
+    // Replace any existing expenses so only the latest imported file's
+    // data is kept in the app.
+    Store.setExpenses(newExpenses);
 
     delete window._importData;
     App.closeModal();
