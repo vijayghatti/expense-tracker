@@ -376,4 +376,11 @@ const App = (() => {
 })();
 
 // Boot
-document.addEventListener('DOMContentLoaded', App.init);
+document.addEventListener('DOMContentLoaded', () => {
+  // If Security module is available, require unlock before loading the app
+  if (window.Security && typeof Security.init === 'function') {
+    Security.init(App.init);
+  } else {
+    App.init();
+  }
+});
