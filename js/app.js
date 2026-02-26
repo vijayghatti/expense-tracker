@@ -342,6 +342,16 @@ const App = (() => {
     if (e.key === 'Escape') {
       closeModal();
       document.querySelector('.confirm-overlay')?.remove();
+      return;
+    }
+
+    // Ctrl+R (or Cmd+R on macOS) => open Excel import file picker
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
+      e.preventDefault();
+      // Ensure expenses tab is visible so the input exists
+      switchTab('expenses');
+      const input = document.getElementById('excel-import-input');
+      if (input) input.click();
     }
   });
 

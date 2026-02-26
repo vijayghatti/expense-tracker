@@ -38,6 +38,14 @@ const Excel = (() => {
     App.openModal(html);
   }
 
+  function formatMonth(yearMonth) {
+    if (!yearMonth || yearMonth === 'Unknown') return 'Unknown';
+    const [year, month] = yearMonth.split('-');
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const m = parseInt(month, 10);
+    return `${names[m - 1] || month} ${year}`;
+  }
+
   function doExport(format) {
     const expenses = Expenses.getFilteredExpenses();
     const rows = expenses.map(e => ({
@@ -51,7 +59,30 @@ const Excel = (() => {
 
     const timestamp = new Date().toISOString().slice(0, 10);
     if (format === 'excel') {
-      MiniXLSX.exportToExcel(rows, 'Expenses', `expenses_${timestamp}.xls`);
+      // Compute category totals
+      const catTotals = {};
+      expenses.forEach(e => {
+        const cat = e.category || 'Other';
+        catTotals[cat] = (catTotals[cat] || 0) + Number(e.amount);
+      });
+      const catData = Object.entries(catTotals)
+        .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+        .sort((a, b) => b.amount - a.amount);
+
+      // Compute monthly totals
+      const monthTotals = {};
+      expenses.forEach(e => {
+        const month = e.date ? e.date.slice(0, 7) : 'Unknown';
+        monthTotals[month] = (monthTotals[month] || 0) + Number(e.amount);
+      });
+      const monthData = Object.entries(monthTotals)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, amount]) => ({
+          month: formatMonth(month),
+          amount: Math.round(amount * 100) / 100
+        }));
+
+      MiniXLSX.exportToExcelWithCharts(rows, catData, monthData, `expenses_${timestamp}.xlsx`);
     } else {
       MiniXLSX.exportToCSV(rows, `expenses_${timestamp}.csv`);
     }
@@ -161,6 +192,10 @@ const Excel = (() => {
       Utils.showToast('Date and Amount columns are required', 'error');
       return;
     }
+
+    // Replace any existing expenses so only the latest imported file's
+    // data is kept in the app.
+    Store.setExpenses([]);
 
     const categories = Store.getCategories().map(c => c.name);
     let imported = 0;

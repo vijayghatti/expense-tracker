@@ -16,14 +16,14 @@ const Expenses = (() => {
     const { start, end } = Utils.getCurrentMonthRange();
     container.innerHTML = `
       <div class="toolbar">
-        <div class="toolbar-left">
-          <button class="btn btn-primary" onclick="Expenses.openModal()">+ Add Expense</button>
-          <div class="file-input-wrapper">
-            <button class="btn btn-secondary">📥 Import</button>
-            <input type="file" accept=".csv,.tsv,.xls,.xlsx" onchange="Excel.handleImport(event)">
-          </div>
-          <button class="btn btn-secondary" onclick="Excel.exportExpenses()">📤 Export</button>
-        </div>
+      <div class="toolbar-left">
+      <button class="btn btn-primary" onclick="Expenses.openModal()">+ Add Expense</button>
+      <div class="file-input-wrapper">
+      <button class="btn btn-secondary">📥 Import</button>
+      <input id="excel-import-input" type="file" accept=".csv,.tsv,.xls,.xlsx" onchange="Excel.handleImport(event)">
+      </div>
+      <button class="btn btn-secondary" onclick="Excel.exportExpenses()">📤 Export</button>
+      </div>
         <div class="toolbar-right">
           <input type="text" class="filter-input" placeholder="🔍 Search..." id="expense-search"
             oninput="Expenses.setSearch(this.value)" value="${Utils.escapeHtml(filterSearch)}">
