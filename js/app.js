@@ -337,7 +337,7 @@ const App = (() => {
     });
   }
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — use capture phase so we get the event first
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeModal();
@@ -345,15 +345,28 @@ const App = (() => {
       return;
     }
 
-    // Ctrl+R (or Cmd+R on macOS) => open Excel import file picker
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
+    // Ctrl+I (Windows/Linux) or Cmd+I (macOS) => open Excel import file picker
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
       e.preventDefault();
-      // Ensure expenses tab is visible so the input exists
-      switchTab('expenses');
-      const input = document.getElementById('excel-import-input');
-      if (input) input.click();
+      e.stopPropagation();
+
+      // Switch to expenses tab if not already there
+      if (activeTab !== 'expenses') switchTab('expenses');
+
+      // Create a temporary file input and click it immediately
+      // This is more reliable than clicking the hidden DOM input
+      const tmp = document.createElement('input');
+      tmp.type = 'file';
+      tmp.accept = '.csv,.tsv,.xls,.xlsx';
+      tmp.style.display = 'none';
+      tmp.addEventListener('change', (ev) => {
+        Excel.handleImport(ev);
+        tmp.remove();
+      });
+      document.body.appendChild(tmp);
+      tmp.click();
     }
-  });
+  }, true);
 
   return {
     init, switchTab, toggleTheme, openModal, closeModal, confirm,

@@ -82,7 +82,10 @@ const Excel = (() => {
           amount: Math.round(amount * 100) / 100
         }));
 
-      MiniXLSX.exportToExcelWithCharts(rows, catData, monthData, `expenses_${timestamp}.xlsx`);
+      // Pass ALL categories (not just ones with expenses) so the Excel
+      // dropdown shows the full list regardless of what's currently recorded.
+      const allCategoryNames = Store.getCategories().map(c => c.name);
+      MiniXLSX.exportToExcelWithCharts(rows, catData, monthData, allCategoryNames, `expenses_${timestamp}.xlsx`);
     } else {
       MiniXLSX.exportToCSV(rows, `expenses_${timestamp}.csv`);
     }

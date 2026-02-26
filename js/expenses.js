@@ -19,7 +19,7 @@ const Expenses = (() => {
       <div class="toolbar-left">
       <button class="btn btn-primary" onclick="Expenses.openModal()">+ Add Expense</button>
       <div class="file-input-wrapper">
-      <button class="btn btn-secondary" title="Ctrl+R (Windows) / ⌘+R (Mac) to import quickly">📥 Import</button>
+      <button class="btn btn-secondary" title="Ctrl+I (Windows) / ⌘+I (Mac) to import quickly">📥 Import</button>
       <input id="excel-import-input" type="file" accept=".csv,.tsv,.xls,.xlsx" onchange="Excel.handleImport(event)">
       </div>
       <button class="btn btn-secondary" onclick="Excel.exportExpenses()">📤 Export</button>
